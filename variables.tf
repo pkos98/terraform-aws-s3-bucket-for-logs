@@ -47,6 +47,11 @@ variable "readers" {
   type        = list(string)
   default     = []
 }
+variable "aws_partition" {
+  description = "The AWS partition used to reference resources internally (excluding reader accounts)."
+  type        = string
+  default     = "aws"
+}
 data "aws_elb_service_account" "current" {}
 data "aws_caller_identity" "current" {}
 
@@ -58,6 +63,7 @@ locals {
   elb_service_account_arn = data.aws_elb_service_account.current.arn
   readers                 = var.readers
   force_destroy           = var.force_destroy
+  aws_partition           = var.aws_partition
 
   tags = {
     Module       = "S3 Bucket for Logs"

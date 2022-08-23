@@ -8,7 +8,7 @@ data "aws_iam_policy_document" "s3" {
     actions = [
       "s3:PutObject"
     ]
-    resources = ["arn:aws:s3:::${local.bucket}/${local.s3_logs_prefix}/*"]
+    resources = ["arn:${local.aws_partition}:s3:::${local.bucket}/${local.s3_logs_prefix}/*"]
   }
 }
 
@@ -19,7 +19,7 @@ data "aws_iam_policy_document" "alb" {
       type        = "AWS"
     }
     actions   = ["s3:PutObject"]
-    resources = ["arn:aws:s3:::${local.bucket}/${local.alb_logs_prefix}/AWSLogs/${local.account_id}/*"]
+    resources = ["arn:${local.aws_partition}:s3:::${local.bucket}/${local.alb_logs_prefix}/AWSLogs/${local.account_id}/*"]
   }
 
   statement {
@@ -28,7 +28,7 @@ data "aws_iam_policy_document" "alb" {
       type        = "Service"
     }
     actions   = ["s3:PutObject"]
-    resources = ["arn:aws:s3:::${local.bucket}/${local.alb_logs_prefix}/AWSLogs/${local.account_id}/*"]
+    resources = ["arn:${local.aws_partition}:s3:::${local.bucket}/${local.alb_logs_prefix}/AWSLogs/${local.account_id}/*"]
     condition {
       test     = "StringEquals"
       values   = ["bucket-owner-full-control"]
@@ -42,7 +42,7 @@ data "aws_iam_policy_document" "alb" {
       type        = "Service"
     }
     actions   = ["s3:GetBucketAcl"]
-    resources = ["arn:aws:s3:::${local.bucket}"]
+    resources = ["arn:${local.aws_partition}:s3:::${local.bucket}"]
   }
 }
 
@@ -52,19 +52,21 @@ data "aws_iam_policy_document" "cloudfront" {
       // Canonical ID transforms to this value and there is always drift
       // "c4c1ede66af53448b93c283ce9448c4ba468c9432aa01d700d3878632f77d2d0"
       // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/AccessLogs.html
-      identifiers = ["arn:aws:iam::162777425019:root"]
+      identifiers = ["arn:${local.aws_partition}:iam::162777425019:root"]
       type        = "AWS"
     }
     actions   = ["s3:PutObject"]
-    resources = ["arn:aws:s3:::${local.bucket}/${var.cdn_logs_path}/*"]
+    resources = ["arn:${local.aws_partition}:s3:::${local.bucket}/${var.cdn_logs_path}/*"]
   }
 }
 
 data "aws_iam_policy_document" "external_readers" {
   statement {
     principals {
-      identifiers = formatlist("arn:aws:iam::%s:root", local.readers)
-      type        = "AWS"
+      full_arns       = [for r in local.readers : r if length(regexall("^arn:aws(-cn|-us-gov)?:", local.readers)) > 0]
+      account_numbers = setsubtract(local.readers, full_arns)
+      identifiers     = concat(formatlist("arn:aws:iam::%s:root", account_numbers), full_arns)
+      type            = "AWS"
     }
     actions = [
       "s3:Get*"
